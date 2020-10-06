@@ -34,12 +34,16 @@ use std::{
 };
 use tokio::runtime::Handle;
 use vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
+use tracing::{span, debug_span};
+use tracing_attributes::instrument;
+use tracing_atrace::InstrumentExt;
 
 // ============================== //
 //  broadcast_coordinator tasks  //
 // ============================== //
 
 /// attempts broadcast to `peer` and schedules the next broadcast
+#[instrument(skip(smp, scheduled_broadcasts))]
 pub(crate) fn execute_broadcast<V>(
     peer: PeerNetworkId,
     backoff: bool,
@@ -72,6 +76,7 @@ pub(crate) fn execute_broadcast<V>(
 // =============================== //
 
 /// processes transactions directly submitted by client
+#[instrument(skip(smp, callback))]
 pub(crate) async fn process_client_transaction_submission<V>(
     smp: SharedMempool<V>,
     transaction: SignedTransaction,
@@ -98,6 +103,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
 }
 
 /// processes transactions from other nodes
+#[instrument(skip(smp, transactions))]
 pub(crate) async fn process_transaction_broadcast<V>(
     mut smp: SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
@@ -163,6 +169,7 @@ fn is_txn_retryable(result: SubmissionStatus) -> bool {
 
 /// submits a list of SignedTransaction to the local mempool
 /// and returns a vector containing AdmissionControlStatus
+#[instrument(skip(smp, transactions, timeline_state))]
 pub(crate) async fn process_incoming_transactions<V>(
     smp: &SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
@@ -307,6 +314,7 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
 // ================================= //
 // intra-node communication handlers //
 // ================================= //
+#[instrument(skip(mempool, req))]
 pub(crate) async fn process_state_sync_request(
     mempool: Arc<Mutex<CoreMempool>>,
     req: CommitNotification,
@@ -341,6 +349,7 @@ pub(crate) async fn process_state_sync_request(
         .observe(latency.as_secs_f64());
 }
 
+#[instrument(skip(mempool, req))]
 pub(crate) async fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: ConsensusRequest) {
     //start latency timer
     let start_time = Instant::now();
@@ -403,6 +412,7 @@ pub(crate) async fn process_consensus_request(mempool: &Mutex<CoreMempool>, req:
         .observe(latency.as_secs_f64());
 }
 
+#[instrument(skip(mempool, transactions))]
 async fn commit_txns(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<CommittedTransaction>,
@@ -427,6 +437,7 @@ async fn commit_txns(
 }
 
 /// processes on-chain reconfiguration notification
+#[instrument(skip(config_update, validator))]
 pub(crate) async fn process_config_update<V>(
     config_update: OnChainConfigPayload,
     validator: Arc<RwLock<V>>,

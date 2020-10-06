@@ -6,6 +6,7 @@
 use libra_config::config::NodeConfig;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tracing_subscriber::{prelude::*, registry::Registry};
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Libra Node")]
@@ -35,6 +36,15 @@ fn main() {
     } else {
         let config = NodeConfig::load(args.config.unwrap()).expect("Failed to load node config");
         println!("Using node config {:?}", &config);
+        setup_global_subscriber();
         libra_node::start(&config, None);
     };
+}
+
+fn setup_global_subscriber() {
+    let layer = tracing_atrace::layer().unwrap().with_fields(Option::Some(
+        "peer,new_round_event,author,message_round,round,peer_id".to_string(),
+    ));
+    let subscriber = Registry::default().with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 }

@@ -11,6 +11,7 @@
 #![cfg_attr(not(feature = "fuzzing"), deny(missing_docs))]
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
+#![type_length_limit="884889069"]
 
 mod block_storage;
 mod consensusdb;

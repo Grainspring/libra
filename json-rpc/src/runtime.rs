@@ -21,6 +21,9 @@ use warp::{
     reject::{self, Reject},
     Filter,
 };
+use tracing::{span, debug_span};
+use tracing_attributes::instrument;
+use tracing_atrace::InstrumentExt;
 
 // Counter labels for runtime metrics
 const LABEL_FAIL: &str = "fail";
@@ -173,6 +176,7 @@ pub fn bootstrap_from_config(
 /// JSON RPC entry point
 /// Handles all incoming rpc requests
 /// Performs routing based on methods defined in `registry`
+#[instrument(skip(service, registry))]
 pub(crate) async fn rpc_endpoint(
     data: Value,
     service: JsonRpcService,
@@ -186,7 +190,7 @@ pub(crate) async fn rpc_endpoint(
     let timer = counters::RPC_REQUEST_LATENCY
         .with_label_values(&[label])
         .start_timer();
-    let ret = rpc_endpoint_without_metrics(data, service, registry).await;
+    let ret = rpc_endpoint_without_metrics(data, service, registry).instrument(debug_span!("rpc_endpoint_without_metrics")).await;
     timer.stop_and_record();
     ret
 }
@@ -222,7 +226,7 @@ async fn rpc_endpoint_without_metrics(
                         trace_id,
                     )
                 });
-                let responses = join_all(futures).await;
+                let responses = join_all(futures).instrument(debug_span!("rpc_request.join_all")).await;
                 for resp in &responses {
                     log_response!(trace_id, &resp, true);
                 }
@@ -254,6 +258,7 @@ async fn rpc_endpoint_without_metrics(
 
 /// Handler of single RPC request
 /// Performs validation and executes corresponding rpc handler
+#[instrument(skip(service, registry, ledger_info))]
 async fn rpc_request_handler(
     req: Value,
     service: JsonRpcService,
@@ -330,7 +335,7 @@ async fn rpc_request_handler(
                 let timer = counters::METHOD_LATENCY
                     .with_label_values(&[request_type_label, name])
                     .start_timer();
-                match handler(service, request_params).await {
+                match handler(service, request_params).instrument(debug_span!("handler")).await {
                     Ok(result) => {
                         response.result = Some(result);
                         counters::REQUESTS

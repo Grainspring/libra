@@ -37,6 +37,9 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{DbReader, Order};
+use tracing::{span, debug_span};
+use tracing_attributes::instrument;
+use tracing_atrace::InstrumentExt;
 
 #[derive(Clone)]
 pub(crate) struct JsonRpcService {
@@ -202,6 +205,7 @@ impl JsonRpcRequest {
 }
 
 /// Submits transaction to full node
+#[instrument(skip(service, request))]
 async fn submit(mut service: JsonRpcService, request: JsonRpcRequest) -> Result<()> {
     let transaction = request.parse_signed_transaction(0, "data")?;
 
@@ -212,7 +216,7 @@ async fn submit(mut service: JsonRpcService, request: JsonRpcRequest) -> Result<
         .mempool_sender
         .send((transaction, req_sender))
         .await?;
-    let (mempool_status, vm_status_opt) = callback.await??;
+    let (mempool_status, vm_status_opt) = callback.instrument(debug_span!("submit_callback")).await??;
 
     if let Some(vm_status) = vm_status_opt {
         Err(Error::new(JsonRpcError::vm_status(vm_status)))
@@ -224,6 +228,7 @@ async fn submit(mut service: JsonRpcService, request: JsonRpcRequest) -> Result<
 }
 
 /// Returns account state (AccountView) by given address
+#[instrument(skip(service, request))]
 async fn get_account(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -271,6 +276,7 @@ async fn get_account(
 /// Returns the blockchain metadata for a specified version. If no version is specified, default to
 /// returning the current blockchain metadata
 /// Can be used to verify that target Full Node is up-to-date
+#[instrument(skip(service, request))]
 async fn get_metadata(service: JsonRpcService, request: JsonRpcRequest) -> Result<BlockMetadata> {
     let chain_id = service.chain_id().id();
     if !request.params.is_empty() {
@@ -290,6 +296,7 @@ async fn get_metadata(service: JsonRpcService, request: JsonRpcRequest) -> Resul
 }
 
 /// Returns transactions by range
+#[instrument(skip(service, request))]
 async fn get_transactions(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -350,6 +357,7 @@ async fn get_transactions(
 }
 
 /// Returns account transaction by account and sequence_number
+#[instrument(skip(service, request))]
 async fn get_account_transaction(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -393,6 +401,7 @@ async fn get_account_transaction(
 }
 
 /// Returns events by given access path
+#[instrument(skip(service, request))]
 async fn get_events(service: JsonRpcService, request: JsonRpcRequest) -> Result<Vec<EventView>> {
     let event_key = request.parse_event_key(0, "event key")?;
 
@@ -415,6 +424,7 @@ async fn get_events(service: JsonRpcService, request: JsonRpcRequest) -> Result<
 }
 
 /// Returns meta information about supported currencies
+#[instrument(skip(service, request))]
 async fn get_currencies(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -436,6 +446,7 @@ async fn get_currencies(
 }
 
 /// Returns all account transactions
+#[instrument(skip(service, request))]
 async fn get_account_transactions(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -503,6 +514,7 @@ async fn get_account_transactions(
 }
 
 /// Returns proof of new state relative to version known to client
+#[instrument(skip(service, request))]
 async fn get_state_proof(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -517,6 +529,7 @@ async fn get_state_proof(
 /// Returns the account state to the client, alongside a proof relative to the version and
 /// ledger_version specified by the client. If version or ledger_version are not specified,
 /// the latest known versions will be used.
+#[instrument(skip(service, request))]
 async fn get_account_state_with_proof(
     service: JsonRpcService,
     request: JsonRpcRequest,
@@ -537,6 +550,7 @@ async fn get_account_state_with_proof(
 }
 
 /// Returns the number of peers this node is connected to
+#[instrument(skip(service, _request))]
 async fn get_network_status(service: JsonRpcService, _request: JsonRpcRequest) -> Result<u64> {
     let peers = counters::LIBRA_NETWORK_PEERS
         .get_metric_with_label_values(&[service.role.as_str(), "connected"])?;

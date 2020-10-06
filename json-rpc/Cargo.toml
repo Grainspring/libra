@@ -18,7 +18,7 @@ once_cell = "1.4.1"
 rand = "0.7.3"
 serde_json = "1.0.58"
 serde = { version = "1.0.116", default-features = false }
-tokio = { version = "0.2.22", features = ["full"] }
+tokio = { version = "0.2.22", features = ["full", "tracing"] }
 warp = "0.2.5"
 reqwest = { version = "0.10.8", features = ["blocking", "json"], default_features = false, optional = true }
 proptest = { version = "0.10.1", optional = true }
@@ -39,6 +39,10 @@ libra-workspace-hack = { path = "../common/workspace-hack", version = "0.1.0" }
 move-core-types = { path = "../language/move-core/types", version = "0.1.0" }
 network = { path = "../network", version = "0.1.0" }
 storage-interface = { path = "../storage/storage-interface", version = "0.1.0" }
+tracing = { version="0.1" }
+tracing-attributes = "0.1.2"
+tracing-atrace = { path = "../common/tracing", version = "0.1.0" }
+tracing-futures =  { version = "0.2.1", features = ["futures-01"] }
 
 [dev-dependencies]
 proptest = "0.10.1"

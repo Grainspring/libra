@@ -34,6 +34,9 @@ use std::{
 };
 use tokio::{runtime::Handle, time::interval};
 use vm_validator::vm_validator::TransactionValidation;
+use tracing::{span, debug_span};
+use tracing_attributes::instrument;
+use tracing_atrace::InstrumentExt;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
 pub(crate) async fn coordinator<V>(
@@ -82,10 +85,11 @@ pub(crate) async fn coordinator<V>(
                     msg,
                     callback,
                 ))
+                .instrument(debug_span!("mempool.process_client_transaction_submission"))
                 .await;
             },
             msg = consensus_requests.select_next_some() => {
-                tasks::process_consensus_request(&mempool, msg).await;
+                tasks::process_consensus_request(&mempool, msg).instrument(debug_span!("mempool.process_consensus_request")).await;
             }
             msg = state_sync_requests.select_next_some() => {
                 let _ = counters::TASK_SPAWN_LATENCY

@@ -14,7 +14,7 @@ fail = "0.4.0"
 futures = "0.3.5"
 jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 structopt = "0.3.18"
-tokio = { version = "0.2.22", features = ["full"] }
+tokio = { version = "0.2.22", features = ["full", "tracing"] }
 
 backup-service = { path = "../storage/backup/backup-service", version = "0.1.0" }
 consensus = { path = "../consensus", version = "0.1.0" }
@@ -26,6 +26,7 @@ libra-config = { path = "../config", version = "0.1.0" }
 libra-crypto = { path = "../crypto/crypto", version = "0.1.0" }
 libra-genesis-tool = {path = "../config/management/genesis", version = "0.1.0", features = ["testing"] }
 libra-json-rpc = { path = "../json-rpc", version = "0.1.0" }
+libatrace = { path = "../common/libatrace", version = "0.1.0" }
 libra-logger = { path = "../common/logger", version = "0.1.0" }
 libra-mempool = { path = "../mempool", version = "0.1.0" }
 libra-metrics = { path = "../common/metrics", version = "0.1.0" }
@@ -42,6 +43,9 @@ storage-client = { path = "../storage/storage-client", version = "0.1.0" }
 storage-interface= { path = "../storage/storage-interface", version = "0.1.0" }
 storage-service = { path = "../storage/storage-service", version = "0.1.0" }
 subscription-service = { path = "../common/subscription-service", version = "0.1.0" }
+tracing = { version="0.1" }
+tracing-atrace = { path = "../common/tracing", version = "0.1.0" }
+tracing-subscriber = { version = "0.2.12", features = ["json", "chrono"] }
 
 [features]
 default = []

@@ -151,6 +151,8 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
+    "common/libatrace",
+    "common/tracing",
     "common/trace",
     "config/generate-key",
     "config/management/genesis",

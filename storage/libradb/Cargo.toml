@@ -35,6 +35,10 @@ libra-workspace-hack = { path = "../../common/workspace-hack", version = "0.1.0"
 num-variants = { path = "../../common/num-variants", version = "0.1.0" }
 schemadb = { path = "../schemadb", version = "0.1.0" }
 storage-interface = { path = "../storage-interface", version = "0.1.0" }
+tracing = { version="0.1" }
+tracing-attributes = "0.1.2"
+tracing-atrace = { path = "../../common/tracing", version = "0.1.0" }
+tracing-futures =  { version = "0.2.1", features = ["futures-01"] }
 
 [dev-dependencies]
 proptest = "0.10.1"

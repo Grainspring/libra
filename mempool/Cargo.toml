@@ -40,6 +40,10 @@ subscription-service = { path = "../common/subscription-service", version = "0.1
 vm-validator = { path = "../vm-validator", version = "0.1.0" }
 
 storage-service = { path = "../storage/storage-service", version = "0.1.0", optional = true }
+tracing = { version="0.1" }
+tracing-attributes = "0.1.2"
+tracing-atrace = { path = "../common/tracing", version = "0.1.0" }
+tracing-futures =  { version = "0.2.1", features = ["futures-01"] }
 
 [dev-dependencies]
 proptest = "0.10.1"

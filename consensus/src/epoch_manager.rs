@@ -41,6 +41,9 @@ use libra_types::{
 use network::protocols::network::Event;
 use safety_rules::SafetyRulesManager;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
+use tracing::{span, debug_span};
+use tracing_attributes::instrument;
+use tracing_atrace::InstrumentExt;
 
 /// RecoveryManager is used to process events in order to sync up with peer if we can't recover from local consensusdb
 /// RoundManager is used for normal event handling.
@@ -189,6 +192,7 @@ impl EpochManager {
         }
     }
 
+    #[instrument(skip(self, request))]
     async fn process_epoch_retrieval(
         &mut self,
         request: EpochRetrievalRequest,
@@ -213,6 +217,7 @@ impl EpochManager {
         ))
     }
 
+    #[instrument(skip(self))]
     async fn process_different_epoch(
         &mut self,
         different_epoch: u64,
@@ -254,6 +259,7 @@ impl EpochManager {
         }
     }
 
+    #[instrument(skip(self, proof))]
     async fn start_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
         let ledger_info = proof
             .verify(self.epoch_state())
@@ -276,6 +282,7 @@ impl EpochManager {
         Ok(())
     }
 
+    #[instrument(skip(self, recovery_data, epoch_state))]
     async fn start_round_manager(&mut self, recovery_data: RecoveryData, epoch_state: EpochState) {
         // Release the previous RoundManager, especially the SafetyRule client
         self.processor = None;
@@ -352,6 +359,7 @@ impl EpochManager {
     // event processor at startup. If we need to sync up with peers for blocks to construct
     // a valid block store, which is required to construct an event processor, we will take
     // care of the sync up here.
+    #[instrument(skip(self, ledger_recovery_data, epoch_state))]
     async fn start_recovery_manager(
         &mut self,
         ledger_recovery_data: LedgerRecoveryData,
@@ -374,6 +382,7 @@ impl EpochManager {
         info!(epoch = epoch, "SyncProcessor started");
     }
 
+    #[instrument(skip(self, payload))]
     async fn start_processor(&mut self, payload: OnChainConfigPayload) {
         let validator_set: ValidatorSet = payload
             .get()
@@ -394,6 +403,7 @@ impl EpochManager {
         }
     }
 
+    #[instrument(skip(self))]
     async fn process_message(
         &mut self,
         peer_id: AccountAddress,
@@ -424,6 +434,7 @@ impl EpochManager {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn process_epoch(
         &mut self,
         peer_id: AccountAddress,
@@ -476,6 +487,7 @@ impl EpochManager {
         Ok(None)
     }
 
+    #[instrument(skip(self, event))]
     async fn process_event(
         &mut self,
         peer_id: AccountAddress,
@@ -514,6 +526,7 @@ impl EpochManager {
             .expect("[EpochManager] not started yet")
     }
 
+    #[instrument(skip(self, request))]
     async fn process_block_retrieval(
         &mut self,
         request: IncomingBlockRetrievalRequest,
@@ -524,6 +537,7 @@ impl EpochManager {
         }
     }
 
+    #[instrument(skip(self))]
     async fn process_local_timeout(&mut self, round: u64) -> anyhow::Result<()> {
         match self.processor_mut() {
             RoundProcessor::Normal(p) => p.process_local_timeout(round).await,
@@ -531,6 +545,7 @@ impl EpochManager {
         }
     }
 
+    #[instrument(skip(self))]
     async fn expect_new_epoch(&mut self) {
         if let Some(payload) = self.reconfig_events.next().await {
             self.start_processor(payload).await;
@@ -539,6 +554,7 @@ impl EpochManager {
         }
     }
 
+    #[instrument(skip(self, round_timeout_sender_rx, network_receivers))]
     pub async fn start(
         mut self,
         mut round_timeout_sender_rx: channel::Receiver<Round>,

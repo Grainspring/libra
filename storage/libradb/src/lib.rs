@@ -76,6 +76,7 @@ use libra_types::{
 use schemadb::{ColumnFamilyName, DB, DEFAULT_CF_NAME};
 use std::{iter::Iterator, path::Path, sync::Arc, time::Instant};
 use storage_interface::{DbReader, DbWriter, Order, StartupInfo, TreeState};
+use tracing::{span, debug_span};
 
 const MAX_LIMIT: u64 = 1000;
 
@@ -272,6 +273,7 @@ impl LibraDB {
         } else {
             None
         };
+        tracing::info!("get_transaction_with_proof, version:{:?}, ledger_version:{:?}", version, ledger_version);
 
         Ok(TransactionWithProof {
             version,
@@ -397,6 +399,7 @@ impl LibraDB {
         mut cs: &mut ChangeSet,
     ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
+        tracing::info!("save_transactions_impl, last_version:{}", last_version);
 
         // Account state updates. Gather account state root hashes
         let account_state_sets = txns_to_commit
@@ -406,6 +409,7 @@ impl LibraDB {
         let state_root_hashes =
             self.state_store
                 .put_account_state_sets(account_state_sets, first_version, &mut cs)?;
+        tracing::info!("after put_account_state_sets");
 
         // Event updates. Gather event accumulator root hashes.
         let event_root_hashes = zip_eq(first_version..=last_version, txns_to_commit)
@@ -414,6 +418,7 @@ impl LibraDB {
                     .put_events(ver, txn_to_commit.events(), &mut cs)
             })
             .collect::<Result<Vec<_>>>()?;
+        tracing::info!("after put_events");
 
         // Transaction updates. Gather transaction hashes.
         zip_eq(first_version..=last_version, txns_to_commit)
@@ -422,6 +427,7 @@ impl LibraDB {
                     .put_transaction(ver, txn_to_commit.transaction(), &mut cs)
             })
             .collect::<Result<()>>()?;
+        tracing::info!("after put_transaction");
 
         // Transaction accumulator updates. Get result root hash.
         let txn_infos = izip!(txns_to_commit, state_root_hashes, event_root_hashes)
@@ -440,6 +446,7 @@ impl LibraDB {
         let new_root_hash =
             self.ledger_store
                 .put_transaction_infos(first_version, &txn_infos, &mut cs)?;
+        tracing::info!("after put_transaction_infos, new_root_hash:{}", &new_root_hash);
 
         Ok(new_root_hash)
     }
@@ -449,7 +456,7 @@ impl LibraDB {
     /// LedgerCounters.
     fn commit(&self, sealed_cs: SealedChangeSet) -> Result<()> {
         self.db.write_schemas(sealed_cs.batch)?;
-
+        tracing::info!("after commit");
         let _timer = LIBRA_STORAGE_OTHER_TIMERS_SECONDS
             .with_label_values(&["get_approximate_cf_sizes"])
             .start_timer();
@@ -483,6 +490,7 @@ impl DbReader for LibraDB {
         start_epoch: u64,
         end_epoch: u64,
     ) -> Result<EpochChangeProof> {
+        tracing::info!("get_epoch_ending_ledger_infos,start_epoch:{:?},end_epoch:{}", start_epoch, end_epoch);
         gauged_api("get_epoch_ending_ledger_infos", || {
             let (ledger_info_with_sigs, more) =
                 Self::get_epoch_ending_ledger_infos(&self, start_epoch, end_epoch)?;
@@ -494,6 +502,7 @@ impl DbReader for LibraDB {
         &self,
         address: AccountAddress,
     ) -> Result<Option<AccountStateBlob>> {
+        tracing::info!("get_latest_account_state,addr:{:?}", address);
         gauged_api("get_latest_account_state", || {
             let ledger_info_with_sigs = self.ledger_store.get_latest_ledger_info()?;
             let version = ledger_info_with_sigs.ledger_info().version();
@@ -505,6 +514,7 @@ impl DbReader for LibraDB {
     }
 
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
+        tracing::info!("get_latest_ledger_info");
         gauged_api("get_latest_ledger_info", || {
             self.ledger_store.get_latest_ledger_info()
         })
@@ -519,6 +529,7 @@ impl DbReader for LibraDB {
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
+        tracing::info!("get_txn_by_account, addr:{:?}, seq_num:{}, ledger_version:{}", address, seq_num, ledger_version);
         gauged_api("get_txn_by_account", || {
             self.transaction_store
                 .lookup_transaction_by_account(address, seq_num, ledger_version)?
@@ -540,6 +551,7 @@ impl DbReader for LibraDB {
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<TransactionListWithProof> {
+        tracing::info!("get_transactions, start_version:{:?}, limit:{}, ledger_version:{}", start_version, limit, ledger_version);
         gauged_api("get_transactions", || {
             error_if_too_many_requested(limit, MAX_LIMIT)?;
 
@@ -589,6 +601,7 @@ impl DbReader for LibraDB {
         order: Order,
         limit: u64,
     ) -> Result<Vec<(u64, ContractEvent)>> {
+        tracing::info!("get_events, event_key:{:?}, start:{}, limit:{}", event_key, start, limit);
         gauged_api("get_events", || {
             let version = self
                 .ledger_store
@@ -606,6 +619,7 @@ impl DbReader for LibraDB {
 
     /// Gets ledger info at specified version and ensures it's an epoch ending.
     fn get_epoch_ending_ledger_info(&self, version: u64) -> Result<LedgerInfoWithSignatures> {
+        tracing::info!("get_epoch_ending_ledger_infos, version:{}", version);
         gauged_api("get_epoch_ending_ledger_info", || {
             self.ledger_store.get_epoch_ending_ledger_info(version)
         })
@@ -616,6 +630,7 @@ impl DbReader for LibraDB {
         known_version: u64,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<(EpochChangeProof, AccumulatorConsistencyProof)> {
+        tracing::info!("get_state_proof_with_ledger_info, known_version:{}", known_version);
         gauged_api("get_state_proof_with_ledger_info", || {
             let ledger_info = ledger_info_with_sigs.ledger_info();
             ensure!(
@@ -648,6 +663,7 @@ impl DbReader for LibraDB {
         EpochChangeProof,
         AccumulatorConsistencyProof,
     )> {
+        tracing::info!("get_state_proof, known_version:{}", known_version);
         gauged_api("get_state_proof", || {
             let ledger_info_with_sigs = self.ledger_store.get_latest_ledger_info()?;
             let (epoch_change_proof, ledger_consistency_proof) = self
@@ -666,6 +682,7 @@ impl DbReader for LibraDB {
         version: Version,
         ledger_version: Version,
     ) -> Result<AccountStateWithProof> {
+        tracing::info!("get_account_state_with_proof, addr:{}, version:{}, ledger_version:{}", address, version, ledger_version);
         gauged_api("get_account_state_with_proof", || {
             ensure!(
                 version <= ledger_version,
@@ -698,6 +715,7 @@ impl DbReader for LibraDB {
     }
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
+        tracing::info!("get_startup_info");
         gauged_api("get_startup_info", || self.ledger_store.get_startup_info())
     }
 
@@ -706,6 +724,7 @@ impl DbReader for LibraDB {
         address: AccountAddress,
         version: Version,
     ) -> Result<(Option<AccountStateBlob>, SparseMerkleProof)> {
+        tracing::info!("get_account_state_with_proof_by_version, addres:{}, version:{}", address, version);
         gauged_api("get_account_state_with_proof_by_version", || {
             self.state_store
                 .get_account_state_with_proof_by_version(address, version)
@@ -713,6 +732,7 @@ impl DbReader for LibraDB {
     }
 
     fn get_latest_state_root(&self) -> Result<(Version, HashValue)> {
+        tracing::info!("get_latest_state_root");
         gauged_api("get_latest_state_root", || {
             let (version, txn_info) = self.ledger_store.get_latest_transaction_info()?;
             Ok((version, txn_info.state_root_hash()))
@@ -720,6 +740,7 @@ impl DbReader for LibraDB {
     }
 
     fn get_latest_tree_state(&self) -> Result<TreeState> {
+        tracing::info!("get_latest_tree_state");
         gauged_api("get_latest_tree_state", || {
             let tree_state = match self.ledger_store.get_latest_transaction_info_option()? {
                 Some((version, txn_info)) => {
@@ -746,6 +767,7 @@ impl DbReader for LibraDB {
     }
 
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
+        tracing::info!("get_block_timestamp, version:{}", version);
         gauged_api("get_block_timestamp", || {
             let ts = match self.transaction_store.get_block_metadata(version)? {
                 Some((_v, block_meta)) => block_meta.into_inner()?.1,
@@ -757,6 +779,7 @@ impl DbReader for LibraDB {
     }
 
     fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
+        tracing::info!("get_latest_transaction_info_option");
         gauged_api("get_latest_transaction_info_option", || {
             self.ledger_store.get_latest_transaction_info_option()
         })
@@ -775,6 +798,7 @@ impl DbWriter for LibraDB {
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
+        tracing::info!("save_transactions, first_version:{}", first_version);
         gauged_api("save_transactions", || {
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
