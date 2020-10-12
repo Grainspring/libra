@@ -373,7 +373,7 @@ impl LibraSwarm {
     }
 
     fn wait_for_startup(&mut self) -> Result<(), SwarmLaunchFailure> {
-        let num_attempts = 120;
+        let num_attempts = 1200;
         let mut done = vec![false; self.nodes.len()];
         for i in 0..num_attempts {
             println!("Wait for startup attempt: {} of {}", i, num_attempts);
@@ -401,7 +401,7 @@ impl LibraSwarm {
                 return Ok(());
             }
 
-            ::std::thread::sleep(::std::time::Duration::from_millis(1000));
+            ::std::thread::sleep(::std::time::Duration::from_millis(10000));
         }
 
         Err(SwarmLaunchFailure::LaunchTimeout)

@@ -14,6 +14,8 @@ anyhow = "1.0.32"
 once_cell = "1.4.1"
 libra-metrics = { path = "../../common/metrics", version = "0.1.0" }
 libra-workspace-hack = { path = "../../common/workspace-hack", version = "0.1.0" }
+tracing = { version="0.1" }
+tracing-atrace = { path = "../../common/tracing", version = "0.1.0" }
 
 [dependencies.rocksdb]
 version = "0.15.0"

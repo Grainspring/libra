@@ -66,17 +66,19 @@ impl SchemaBatch {
     pub fn put<S: Schema>(&mut self, key: &S::Key, value: &S::Value) -> Result<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
+        tracing::info!("SchemaBatch.put.{},key:{:?},value:{:?}", S::COLUMN_FAMILY_NAME, &key, &value);
+
         self.rows
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(BTreeMap::new)
             .insert(key, WriteOp::Value(value));
-
         Ok(())
     }
 
     /// Adds a delete operation to the batch.
     pub fn delete<S: Schema>(&mut self, key: &S::Key) -> Result<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
+        tracing::info!("SchemaBatch.delete.{},key:{:?}", S::COLUMN_FAMILY_NAME, &key);
         self.rows
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(BTreeMap::new)
