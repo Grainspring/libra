@@ -42,7 +42,6 @@ use std::{sync::Arc, time::Duration};
 use termion::color::*;
 use tracing::{span, debug_span};
 use tracing_attributes::instrument;
-use tracing_atrace::InstrumentExt;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -266,8 +265,10 @@ impl RoundManager {
                 ConsensusMsg::ProposalMsg(Box::new(self.generate_proposal(new_round_event).await?));
             tracing::info!("new_round_event, is_valid_proposer:{}", self.proposal_generator.author());
             let mut network = self.network.clone();
+            tracing::info!("new_round_event, broadcast msg:{:?}", proposal_msg);
+            info!(proposalMsg = proposal_msg, "new_round_event, broadcast msg");
+
             network.broadcast(proposal_msg).await;
-            tracing::info!("new_round_event, after broadcast msg");
             counters::PROPOSALS_COUNT.inc();
         }
         Ok(())
@@ -287,7 +288,8 @@ impl RoundManager {
         self.txn_manager.trace_transactions(&signed_proposal);
         trace_edge!("parent_proposal", {"block", signed_proposal.parent_id()}, {"block", signed_proposal.id()});
         trace_event!("round_manager::generate_proposal", {"block", signed_proposal.id()});
-        tracing::info!("generate_proposal, block:{}", signed_proposal.id());
+        tracing::info!("generate_proposal, block:{}", signed_proposal);
+        info!(generate_proposal_block = signed_proposal, "generate_proposal, block");
         debug!(self.new_log(LogEvent::Propose), "{}", signed_proposal);
         // return proposal
         Ok(ProposalMsg::new(
@@ -458,7 +460,8 @@ impl RoundManager {
                     self.new_log(LogEvent::VoteNIL),
                     "Planning to vote for a NIL block {}", nil_block
                 );
-                tracing::info!("process_local_timeout, vote for nil block:{}", nil_block);
+                tracing::info!("process_local_timeout, nil block:{}", nil_block);
+                info!(timeout_nil_block = nil_block, "process_local_timeout, nil block");
                 counters::VOTE_NIL_COUNT.inc();
                 let nil_vote = self.execute_and_vote(nil_block).await?;
                 (false, nil_vote)
@@ -479,6 +482,9 @@ impl RoundManager {
             timeout_vote,
             self.block_store.sync_info(),
         )));
+        tracing::info!("process_local_timeout, broadcast msg:{:?}", timeout_vote_msg);
+        info!(timeout_voteMsg = timeout_vote_msg, "process_local_timeout, broadcast msg");
+
         self.network.broadcast(timeout_vote_msg).await;
         error!(
             round = round,
@@ -493,9 +499,11 @@ impl RoundManager {
     #[instrument(skip(self))]
     async fn process_certificates(&mut self) -> anyhow::Result<()> {
         let sync_info = self.block_store.sync_info();
-        tracing::info!("process_certificates, sync_info:{}", sync_info);
+        tracing::info!("process_certificates, sync_info:{}", serde_json::to_string(&sync_info).unwrap());
+        info!(sync_info = sync_info, "process_certificates, sync_info");
         if let Some(new_round_event) = self.round_state.process_certificates(sync_info) {
             tracing::info!("process_certificates, new_round_event:{}", new_round_event);
+            info!(newroundevt = new_round_event.to_string(), "process_certificates, new_round_event");
             self.process_new_round_event(new_round_event).await?;
         }
         Ok(())
@@ -536,7 +544,7 @@ impl RoundManager {
             "{}", proposal
         );
 
-        tracing::info!("process_proposal, proposal:{}", proposal);
+        tracing::info!("process_proposal, proposal:{}", serde_json::to_string(&proposal).unwrap());
         if let Some(time_to_receival) = duration_since_epoch().checked_sub(block_time_since_epoch) {
             counters::CREATION_TO_RECEIVAL_S.observe_duration(time_to_receival);
         }
@@ -551,9 +559,13 @@ impl RoundManager {
             .get_valid_proposer(proposal_round + 1);
         debug!(self.new_log(LogEvent::Vote).remote_peer(author), "{}", vote);
 
-        tracing::info!("process_proposal, vote:{}", vote);
+        tracing::info!("process_proposal, get vote:{}", serde_json::to_string(&vote).unwrap());
+        info!(vote = vote, "process_proposal, get vote");
+
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote, self.block_store.sync_info());
+        tracing::info!("process_proposal, send vote:{:?} to validator:{:?}", vote_msg, recipients);
+        info!(voteMsg = vote_msg, "process_proposal, send vote");
         self.network.send_vote(vote_msg, vec![recipients]).await;
         Ok(())
     }
@@ -626,7 +638,8 @@ impl RoundManager {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
         trace_code_block!("round_manager::process_vote", {"block", vote_msg.proposed_block_id()});
-        tracing::info!("process_vote_msg, block:{}", vote_msg.proposed_block_id());
+        tracing::info!("process_vote_msg, vote msg:{}", vote_msg);
+        info!(voteMsg = vote_msg, "process_vote_msg, vote msg");
 
         // Check whether this validator is a valid recipient of the vote.
         if self
@@ -659,6 +672,8 @@ impl RoundManager {
             "{}", vote
         );
         tracing::info!("process_vote, vote:{}", vote);
+        info!(vote = vote, "process_vote, vote");
+
         if !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
@@ -693,11 +708,13 @@ impl RoundManager {
                 }) {
                     counters::CREATION_TO_QC_S.observe_duration(time_to_qc);
                 }
-                tracing::info!("process_vote, newquorumcert");
+                tracing::info!("process_vote, newquorumcert:{}", qc);
+                info!(qc = qc, "process_vote, newquorumcert");
                 self.new_qc_aggregated(qc, vote.author()).await
             }
             VoteReceptionResult::NewTimeoutCertificate(tc) => {
-                tracing::info!("process_vote, newtimeoutcert");
+                tracing::info!("process_vote, newtimeoutcert:{}", tc);
+                info!(tc = tc, "process_vote, newtimeoutcert");
                 self.new_tc_aggregated(tc).await
             }
             _ => Ok(()),

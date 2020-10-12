@@ -9,7 +9,7 @@
 //! [`tracing-subscriber::Layer`][layer] implementation for logging `tracing` spans
 //! and events to [`linux kernel debug tracing`][kernel debug tracing], on Linux distributions that
 //! use `debugfs`.
-//!  
+//!
 //! *Compiler support: [requires `rustc` 1.40+][msrv]*
 //!
 //! [msrv]: #supported-rust-versions
@@ -87,7 +87,7 @@ impl Layer {
     /// different name splited by ,.
     pub fn with_fields(mut self, list: Option<String>) -> Self {
         match list  {
-            Some(ref str) => { 
+            Some(ref str) => {
                 let v: Vec<String> = str.split(",").map(|i| i.into()).collect();
                 self.oth_fields = Some(v);
             }
@@ -255,7 +255,7 @@ impl Visit for SpanVisitor<'_> {
             }
         }
         if let Some(oth_fields) = self.oth_fields {
-            if !oth_fields.iter().filter(|&str| str == field.name()).count() > 0 {
+            if oth_fields.iter().filter(|&str| str == field.name()).count() > 0 {
                 write!(self.buf, "{:?}:{:?}", field.name(), value).unwrap();
             }
         }

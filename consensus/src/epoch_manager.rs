@@ -1,6 +1,7 @@
 // Copyright (c) The Libra Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+
 use crate::{
     block_storage::BlockStore,
     counters,
@@ -296,7 +297,9 @@ impl EpochManager {
             "Starting new epoch",
         );
         let last_vote = recovery_data.last_vote();
-
+        let root_block = serde_json::to_string(recovery_data.root_block()).unwrap();
+        tracing::info!("start_round_manager,epoch:{},root_block:{},validators:{:?}",
+            epoch_state.epoch, root_block, epoch_state.verifier.to_string());
         info!(epoch = epoch, "Create BlockStore");
         let block_store = Arc::new(BlockStore::new(
             Arc::clone(&self.storage),

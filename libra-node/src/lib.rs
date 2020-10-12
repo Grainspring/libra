@@ -39,6 +39,7 @@ use std::{
 use storage_interface::DbReaderWriter;
 use storage_service::start_storage_service_with_db;
 use tokio::runtime::{Builder, Runtime};
+use tracing::{span, debug_span};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -86,6 +87,7 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
 
     // Let's now log some important information, since the logger is set up
     info!(config = config, "Loaded config");
+    tracing::info!("Loaded config");
 
     if config.metrics.enabled {
         for network in &config.full_node_networks {
@@ -225,9 +227,11 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let metrics_port = node_config.debug_interface.metrics_server_port;
     let metric_host = node_config.debug_interface.address.clone();
+    tracing::info!("setup_env.metrics.host:{}-port:{}", &metric_host, &metrics_port);
     thread::spawn(move || metric_server::start_server(metric_host, metrics_port, false));
     let public_metrics_port = node_config.debug_interface.public_metrics_server_port;
     let public_metric_host = node_config.debug_interface.address.clone();
+    tracing::info!("setup_env.public.metrics.host:{}-port:{}", &public_metric_host, &public_metrics_port);
     thread::spawn(move || {
         metric_server::start_server(public_metric_host, public_metrics_port, true)
     });
@@ -243,6 +247,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     );
     let _simple_storage_service =
         start_storage_service_with_db(&node_config, Arc::clone(&libra_db));
+
     let backup_service = start_backup_service(
         node_config.storage.backup_service_address,
         Arc::clone(&libra_db),
@@ -260,9 +265,11 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         instant.elapsed().as_millis()
     );
 
+    tracing::info!("storage service started with db:{}", instant.elapsed().as_millis());
+
     instant = Instant::now();
     let chunk_executor = setup_chunk_executor(db_rw.clone());
-    debug!(
+    tracing::info!(
         "ChunkExecutor setup in {} ms",
         instant.elapsed().as_millis()
     );
@@ -296,6 +303,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let mut network_builders = Vec::new();
 
+    tracing::info!("chain_id:{:?}", chain_id);
     // Instantiate every network and collect the requisite endpoints for state_sync, mempool, and consensus.
     for (idx, (role, network_config)) in network_configs.into_iter().enumerate() {
         // Perform common instantiation steps
@@ -315,6 +323,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         let (mempool_sender, mempool_events) = network_builder.add_protocol_handler(
             libra_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
         );
+        tracing::info!("network_build,id:{:?}, idx:{}", &network_id, idx);
         mempool_network_handles.push((
             NodeNetworkId::new(network_id, idx),
             mempool_sender,
@@ -338,7 +347,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             // Currently no FullNode network specific steps.
             RoleType::FullNode => (),
         }
-
+        tracing::info!("network_build, idx:{}", idx);
         reconfig_subscriptions.append(network_builder.reconfig_subscriptions());
 
         network_builders.push(network_builder);
@@ -347,6 +356,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     // Build the configured networks.
     for network_builder in &mut network_builders {
         debug!("Creating runtime for {}", network_builder.network_context());
+        tracing::info!("network_ctx:{} create runtime", network_builder.network_context());
         let runtime = Builder::new()
             .thread_name("network-")
             .threaded_scheduler()
@@ -355,6 +365,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             .expect("Failed to start runtime. Won't be able to start networking.");
         network_builder.build(runtime.handle().clone());
         network_runtimes.push(runtime);
+        tracing::info!("network_ctx:{} built with runtime", network_builder.network_context());
         debug!(
             "Network built for network context: {}",
             network_builder.network_context()
@@ -382,10 +393,12 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         waypoint,
         reconfig_subscriptions,
     );
+    tracing::info!("statesync_bootstrap");
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
     let rpc_runtime = bootstrap_rpc(&node_config, chain_id, libra_db.clone(), mp_client_sender);
 
+    tracing::info!("rpc_bootstrap");
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_requests) = channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
@@ -400,6 +413,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         mempool_reconfig_events,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
+    tracing::info!("mempool.started.{}ms", instant.elapsed().as_millis());
 
     // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
     // network provider -> consensus -> state synchronizer -> network provider.  This has resulted
@@ -410,9 +424,11 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         // TODO: Note that we need the networking layer to be able to discover & connect to the
         // peers with potentially outdated network identity public keys.
         debug!("Wait until state synchronizer is initialized");
+        tracing::info!("Wait until state synchronizer is initialized");
         block_on(state_synchronizer.wait_until_initialized())
             .expect("State synchronizer initialization failure");
         debug!("State synchronizer initialization complete.");
+        tracing::info!("State synchronizer initialization complete.");
 
         // Initialize and start consensus.
         instant = Instant::now();
@@ -426,6 +442,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             consensus_reconfig_events,
         ));
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
+        tracing::info!("consensus.started.{}ms", instant.elapsed().as_millis());
     }
 
     LibraHandle {
