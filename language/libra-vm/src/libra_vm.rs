@@ -23,6 +23,8 @@ use libra_types::{
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+
+use libatrace::{ScopedTrace, TRACE_NAME2, TRACE_NAME};
 use move_core_types::{
     gas_schedule::{CostTable, GasAlgebra, GasUnits},
     identifier::IdentStr,
@@ -69,6 +71,7 @@ impl LibraVMImpl {
         on_chain_config: VMConfig,
         publishing_option: VMPublishingOption,
     ) -> Self {
+        TRACE_NAME2!("libravm.init_with_config:{:?}", &on_chain_config);
         let inner = MoveVM::new();
         Self {
             move_vm: Arc::new(inner),
@@ -104,6 +107,7 @@ impl LibraVMImpl {
     }
 
     pub fn get_gas_schedule(&self, log_context: &impl LogContext) -> Result<&CostTable, VMStatus> {
+        TRACE_NAME!("libraVM.get_gas_schedule");
         self.on_chain_config
             .as_ref()
             .map(|config| &config.gas_schedule)
@@ -127,6 +131,7 @@ impl LibraVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libraVM.check_gas");
         let gas_constants = &self.get_gas_schedule(log_context)?.gas_constants;
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
@@ -214,6 +219,8 @@ impl LibraVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libravm.run_script_prologue");
+        let _inner = MoveVM::new();
         let gas_currency_ty =
             account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
         let txn_sequence_number = txn_data.sequence_number();
@@ -254,6 +261,8 @@ impl LibraVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libravm.run_module_prologue");
+        let _inner = MoveVM::new();
         let gas_currency_ty =
             account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
         let txn_sequence_number = txn_data.sequence_number();
@@ -293,6 +302,8 @@ impl LibraVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libravm.run_success_epilogue");
+        let _inner = MoveVM::new();
         let gas_currency_ty =
             account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
         let txn_sequence_number = txn_data.sequence_number();
@@ -328,6 +339,8 @@ impl LibraVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libravm.run_failure_epilogue");
+        let _inner = MoveVM::new();
         let gas_currency_ty =
             account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
         let txn_sequence_number = txn_data.sequence_number();
@@ -363,6 +376,8 @@ impl LibraVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libravm.run_writeset_prologue");
+        let _inner = MoveVM::new();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
@@ -399,6 +414,7 @@ impl LibraVMImpl {
         should_trigger_reconfiguration: bool,
         log_context: &impl LogContext,
     ) -> Result<(), VMStatus> {
+        TRACE_NAME!("libravm.run_writeset_epilogue");
         let change_set_bytes = lcs::to_bytes(change_set)
             .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_SERIALIZE_WRITE_SET_CHANGES))?;
         let gas_schedule = zero_cost_schedule();
@@ -424,6 +440,7 @@ impl LibraVMImpl {
     }
 
     pub fn new_session<'r, R: RemoteCache>(&self, r: &'r R) -> Session<'r, '_, R> {
+        TRACE_NAME!("libravm.new_session");
         self.move_vm.new_session(r)
     }
 }
@@ -474,7 +491,7 @@ pub fn txn_effects_to_writeset_and_events_cached<C: AccessPathCache>(
 ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
     // TODO: Cache access path computations if necessary.
     let mut ops = vec![];
-
+    TRACE_NAME!("txn_effects_to_writeset_and_events_cached");
     for (addr, vals) in effects.resources {
         for (struct_tag, val_opt) in vals {
             let ap = ap_cache.get_resource_path(addr, struct_tag);
@@ -548,10 +565,10 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, R: RemoteCache>(
         .max_gas_amount()
         .sub(cost_strategy.remaining_gas())
         .get();
-
+    TRACE_NAME2!("get_transaction_output,gas_used:{}", gas_used);
     let effects = session.finish().map_err(|e| e.into_vm_status())?;
     let (write_set, events) = txn_effects_to_writeset_and_events_cached(ap_cache, effects)?;
-
+    info!(write_set = write_set, events = events, "get_transaction_output.effects to writeset");
     Ok(TransactionOutput::new(
         write_set,
         events,

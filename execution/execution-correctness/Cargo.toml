@@ -29,6 +29,8 @@ storage-client = { path = "../../storage/storage-client", version = "0.1.0" }
 thiserror = "1.0.20"
 # this is actually a dev-dependency (see "Conditional compilation of tests" in coding_guidelines.md)
 executor-test-helpers = { path = "../executor-test-helpers", version = "0.1.0", optional = true }
+tracing = { version="0.1" }
+tracing-atrace = { path = "../../common/tracing", version = "0.1.0" }
 
 [dev-dependencies]
 consensus-types = { path = "../../consensus/consensus-types", version = "0.1.0", default-features = false, features = ["fuzzing"] }

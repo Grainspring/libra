@@ -8,6 +8,7 @@ use crate::{
     trace,
 };
 use libra_logger::prelude::*;
+use libatrace::{ScopedTrace, TRACE_NAME2};
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{AbstractMemorySize, GasAlgebra, GasCarrier},
@@ -126,6 +127,7 @@ impl<L: LogContext> Interpreter<L> {
         ty_args: Vec<Type>,
         args: Vec<Value>,
     ) -> VMResult<()> {
+        TRACE_NAME2!("interpreter.execute_main.function:{}", function.name());
         verify_args(function.parameters(), &args).map_err(|e| self.set_location(e))?;
         let mut locals = Locals::new(function.local_count());
         for (i, value) in args.into_iter().enumerate() {
@@ -147,6 +149,8 @@ impl<L: LogContext> Interpreter<L> {
                         .locals
                         .check_resources_for_return()
                         .map_err(|e| set_err_info!(current_frame, e))?;
+                    // TRACE_NAME2!("interpreter.execute_main.frame:{:p},pc:{},return",
+                    //    &current_frame, current_frame.pc);
                     if let Some(frame) = self.call_stack.pop() {
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -169,10 +173,15 @@ impl<L: LogContext> Interpreter<L> {
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     if func.is_native() {
+                        // TRACE_NAME2!("interpreter.execute_main.current_frame:{:p},pc:{},call native func:{}",
+                        //    &current_frame, current_frame.pc, func.name());
                         self.call_native(&resolver, data_store, cost_strategy, func, vec![])?;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
+                    // TRACE_NAME2!("interpreter.execute_main.current_frame:{:p},pc:{}, \
+                    //    call func:{} switch to new frame",
+                    //    &current_frame, current_frame.pc, func.name());
                     let frame = self
                         .make_call_frame(func, vec![])
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
@@ -204,10 +213,15 @@ impl<L: LogContext> Interpreter<L> {
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     if func.is_native() {
+                        // TRACE_NAME2!("interpreter.execute_main.current_frame:{:p},pc:{},call native func:{}",
+                        //    &current_frame, current_frame.pc, func.name());
                         self.call_native(&resolver, data_store, cost_strategy, func, ty_args)?;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
+                    // TRACE_NAME2!("interpreter.execute_main.current_frame:{:p},pc:{}, \
+                    //    call generic func:{} switch to new frame",
+                    //    &current_frame, current_frame.pc, func.name());
                     let frame = self
                         .make_call_frame(func, ty_args)
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
@@ -338,6 +352,7 @@ impl<L: LogContext> Interpreter<L> {
         ty: &Type,
         log_context: &impl LogContext,
     ) -> PartialVMResult<&'a mut GlobalValue> {
+        info!("interpreter.load_resource,addr:{:?},ty:{:?}", addr, ty);
         match data_store.load_resource(addr, ty) {
             Ok(gv) => Ok(gv),
             Err(e) => {
@@ -707,6 +722,7 @@ impl Frame {
         data_store: &mut impl DataStore,
         cost_strategy: &mut CostStrategy,
     ) -> PartialVMResult<ExitCode> {
+        // TRACE_NAME2!("interpreter.frame:{:p}.execute_code_impl.pc:{}", &self, self.pc);
         let code = self.function.code();
         loop {
             for instruction in &code[self.pc as usize..] {

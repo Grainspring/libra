@@ -9,13 +9,16 @@ use crate::{
     session::Session,
 };
 use libra_logger::prelude::*;
+use libatrace::{ScopedTrace, TRACE_NAME2, TRACE_NAME};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     vm_status::StatusCode,
 };
+
 use move_vm_types::{data_store::DataStore, gas_schedule::CostStrategy, values::Value};
+
 use vm::{
     access::ModuleAccess,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
@@ -101,6 +104,7 @@ impl VMRuntime {
         cost_strategy: &mut CostStrategy,
         log_context: &impl LogContext,
     ) -> VMResult<()> {
+        TRACE_NAME!("vm.runtime.execute_script");
         // signer helper closure
         fn is_signer_reference(s: &SignatureToken) -> bool {
             use SignatureToken as S;
@@ -160,6 +164,7 @@ impl VMRuntime {
         cost_strategy: &mut CostStrategy,
         log_context: &impl LogContext,
     ) -> VMResult<()> {
+        TRACE_NAME2!("vm.runtime.execute_functioni.fun_name:{}", function_name);
         // load the function in the given module, perform verification of the module and
         // its dependencies if the module was not loaded
         let (func, type_params) =

@@ -27,6 +27,7 @@ use libra_types::{
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
     write_set::{WriteSet, WriteSetMut},
 };
+use libatrace::{ScopedTrace, TRACE_NAME2, TRACE_NAME};
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits},
@@ -47,6 +48,7 @@ pub struct LibraVM(LibraVMImpl);
 
 impl LibraVM {
     pub fn new<S: StateView>(state: &S) -> Self {
+        TRACE_NAME!("libra_vm.new.with state");
         Self(LibraVMImpl::new(state))
     }
 
@@ -158,11 +160,13 @@ impl LibraVM {
         account_currency_symbol: &IdentStr,
         log_context: &impl LogContext,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+        TRACE_NAME!("execute_script");
         let gas_schedule = self.0.get_gas_schedule(log_context)?;
         let mut session = self.0.new_session(remote_cache);
 
         // Run the validation logic
         {
+            TRACE_NAME!("run_script_prologue.validatelogic");
             cost_strategy.disable_metering();
             self.0.check_gas(txn_data, log_context)?;
             self.0.run_script_prologue(
@@ -176,6 +180,7 @@ impl LibraVM {
 
         // Run the execution logic
         {
+            TRACE_NAME!("run_excute_script.logic");
             cost_strategy.enable_metering();
             cost_strategy
                 .charge_intrinsic_gas(txn_data.transaction_size())
@@ -343,6 +348,7 @@ impl LibraVM {
         txn_sender: Option<AccountAddress>,
         log_context: &impl LogContext,
     ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutput), VMStatus>> {
+        TRACE_NAME!("execute_writeset");
         let gas_schedule = zero_cost_schedule();
         let mut cost_strategy = CostStrategy::system(&gas_schedule, GasUnits::new(0));
 
@@ -401,6 +407,7 @@ impl LibraVM {
         writeset_payload: WriteSetPayload,
         log_context: &impl LogContext,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+        TRACE_NAME!("process_waypoint_change_set");
         let change_set =
             match self.execute_writeset(remote_cache, &writeset_payload, None, log_context) {
                 Ok(cs) => cs,
@@ -598,6 +605,7 @@ impl LibraVM {
             "Executing block, transaction count: {}",
             transactions.len()
         );
+        TRACE_NAME2!("libra_vm.execute_block_impl, transaction count:{}", transactions.len());
 
         let signature_verified_block: Vec<Result<PreprocessedTransaction, VMStatus>>;
         {
@@ -625,13 +633,16 @@ impl LibraVM {
                     execute_block_trace_guard.clear();
                     current_block_id = block_metadata.id();
                     trace_code_block!("libra_vm::execute_block_impl", {"block", current_block_id}, execute_block_trace_guard);
+                    TRACE_NAME2!("libra_vm::execute_block.proces_block_prologue, block:{}", current_block_id);
                     self.process_block_prologue(data_cache, block_metadata, &log_context)?
                 }
                 Ok(PreprocessedTransaction::WaypointWriteSet(write_set_payload)) => {
+                    TRACE_NAME!("libra_vm::execute_block.proces_waypoint_changeset");
                     self.process_waypoint_change_set(data_cache, write_set_payload, &log_context)?
                 }
                 Ok(PreprocessedTransaction::UserTransaction(txn)) => {
                     let _timer = TXN_TOTAL_SECONDS.start_timer();
+                    TRACE_NAME!("libra_vm::execute_block.execute_user_transaction");
                     let (vm_status, output) =
                         self.execute_user_transaction(data_cache, &txn, &log_context);
 
@@ -647,6 +658,7 @@ impl LibraVM {
                     (vm_status, output)
                 }
                 Ok(PreprocessedTransaction::WriteSet(txn)) => {
+                    TRACE_NAME!("libra_vm::execute_block.proces_writeset_transaction");
                     self.process_writeset_transaction(data_cache, *txn, &log_context)?
                 }
                 Err(e) => discard_error_vm_status(e),
@@ -681,6 +693,7 @@ impl LibraVM {
         transactions: Vec<Transaction>,
         state_view: &dyn StateView,
     ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
+        TRACE_NAME!("execute_block_and_keep_vm_status");
         let mut state_view_cache = StateViewCache::new(state_view);
         let mut vm = LibraVM::new(&state_view_cache);
         vm.execute_block_impl(transactions, &mut state_view_cache)
@@ -733,6 +746,7 @@ impl VMExecutor for LibraVM {
         transactions: Vec<Transaction>,
         state_view: &dyn StateView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        TRACE_NAME!("libra_vm::execute_block");
         let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
         Ok(output
             .into_iter()

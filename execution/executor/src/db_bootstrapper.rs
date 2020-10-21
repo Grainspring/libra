@@ -120,6 +120,9 @@ pub fn calculate_genesis<V: VMExecutor>(
     let result =
         executor.execute_block((block_id, vec![genesis_txn.clone()]), *PRE_GENESIS_BLOCK_ID)?;
 
+    tracing::info!("calculate_genesis, execute_block.result:{}", serde_json::to_string(&result).unwrap());
+    info!(computeresut = result, "calculate_genesis,execute_block.result");
+
     let root_hash = result.root_hash();
     let next_epoch_state = result
         .epoch_state()

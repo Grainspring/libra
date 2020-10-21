@@ -64,6 +64,7 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{state_view::VerifiedStateView, DbReaderWriter, TreeState};
+use libatrace::{ScopedTrace, TRACE_NAME2, TRACE_NAME};
 
 /// `Executor` implements all functionalities the execution module needs to provide.
 pub struct Executor<V> {
@@ -268,7 +269,7 @@ where
         // accumulator.
         let mut txn_info_hashes = vec![];
         let mut next_epoch_state = None;
-
+        TRACE_NAME!("process_vm_outputs");
         let proof_reader = ProofReader::new(account_to_proof);
         let new_epoch_event_key = on_chain_config::new_epoch_event_key();
         for (vm_output, txn) in itertools::zip_eq(vm_outputs.into_iter(), transactions.iter()) {
@@ -682,7 +683,7 @@ impl<V: VMExecutor> BlockExecutor for Executor<V> {
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
         let (block_id, mut transactions) = block;
-
+        TRACE_NAME2!("executor.execute_block, block_id:{}", block_id);
         // Reconfiguration rule - if a block is a child of pending reconfiguration, it needs to be empty
         // So we roll over the executed state until it's committed and we start new epoch.
         let (output, state_compute_result) = if parent_block_id != self.committed_block_id()?
@@ -724,7 +725,6 @@ impl<V: VMExecutor> BlockExecutor for Executor<V> {
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                 "execute_block"
             );
-
             let _timer = LIBRA_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
             let parent_block_executed_trees = self.get_executed_trees(parent_block_id)?;
@@ -944,6 +944,9 @@ pub fn process_write_set(
 )> {
     let mut updated_blobs = HashMap::new();
 
+    TRACE_NAME2!("process_writeset,transaction:{:p}", transaction);
+    info!(transaction = transaction, write_set = write_set,
+        account_to_state = account_to_state, "process_write_set");
     // Find all addresses this transaction touches while processing each write op.
     let mut addrs = HashSet::new();
     for (access_path, write_op) in write_set.into_iter() {
@@ -981,6 +984,7 @@ pub fn process_write_set(
     for addr in addrs {
         let account_state = account_to_state.get(&addr).expect("Address should exist.");
         let account_blob = AccountStateBlob::try_from(account_state)?;
+        info!(addr = addr, account_blob = account_blob, "process_write_set update_blobs");
         updated_blobs.insert(addr, account_blob);
     }
     let state_tree = Arc::new(

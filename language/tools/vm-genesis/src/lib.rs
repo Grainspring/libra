@@ -47,6 +47,7 @@ use once_cell::sync::Lazy;
 use rand::prelude::*;
 use transaction_builder::encode_create_designated_dealer_script;
 use vm::{file_format::SignatureToken, CompiledModule};
+use libatrace::{ScopedTrace, TRACE_NAME2, TRACE_NAME};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -79,6 +80,7 @@ pub fn encode_genesis_transaction(
     vm_publishing_option: Option<VMPublishingOption>,
     chain_id: ChainId,
 ) -> Transaction {
+    TRACE_NAME2!("encode_genesis_transaction,root_key:{:?},chain_id:{:?}", libra_root_key, chain_id);
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &libra_root_key,
         &treasury_compliance_key,
@@ -110,6 +112,7 @@ pub fn encode_genesis_change_set(
     vm_publishing_option: VMPublishingOption,
     chain_id: ChainId,
 ) -> ChangeSet {
+    TRACE_NAME!("encode_genesis_change_set");
     // create a data view for move_vm
     let mut state_view = GenesisStateView::new();
     for module in stdlib_modules {
@@ -245,6 +248,7 @@ fn create_and_initialize_main_accounts(
     lbr_ty: &TypeTag,
     chain_id: ChainId,
 ) {
+    TRACE_NAME!("create_and_initialize_main_accounts");
     let libra_root_auth_key = AuthenticationKey::ed25519(libra_root_key);
     let treasury_compliance_auth_key = AuthenticationKey::ed25519(treasury_compliance_key);
 
@@ -312,6 +316,7 @@ fn create_and_initialize_testnet_minting(
     log_context: &impl LogContext,
     public_key: &Ed25519PublicKey,
 ) {
+    TRACE_NAME!("create_and_initialize_testnet_minting");
     let genesis_auth_key = AuthenticationKey::ed25519(public_key);
     let create_dd_script = encode_create_designated_dealer_script(
         account_config::coin1_tmp_tag(),
@@ -382,7 +387,7 @@ fn create_and_initialize_owners_operators(
     operator_registrations: &[OperatorRegistration],
 ) {
     let libra_root_address = account_config::libra_root_address();
-
+    TRACE_NAME2!("create_and_initialize_owners_operators,root_addr:{:?}", libra_root_address);
     // Create accounts for each validator owner. The inputs for creating an account are the auth
     // key prefix and account address. Internally move then computes the auth key as auth key
     // prefix || address. Because of this, the initial auth key will be invalid as we produce the
@@ -397,6 +402,7 @@ fn create_and_initialize_owners_operators(
             staged_owner_auth_key.prefix().to_vec(),
             owner_name.clone(),
         );
+        TRACE_NAME2!("exec_script.owner_address:{:?},auth_key:{:?}", &owner_address, &staged_owner_auth_key);
         exec_script(
             session,
             log_context,
@@ -430,6 +436,7 @@ fn create_and_initialize_owners_operators(
                 operator_auth_key.prefix().to_vec(),
                 operator_name.clone(),
             );
+        TRACE_NAME2!("exec_script.operator_account:{:?},operator_auth_key:{:?}", &operator_account, &operator_auth_key);
         exec_script(
             session,
             log_context,

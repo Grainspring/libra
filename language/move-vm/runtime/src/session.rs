@@ -13,6 +13,7 @@ use move_core_types::{
 };
 use move_vm_types::{gas_schedule::CostStrategy, values::Value};
 use vm::errors::*;
+use libatrace::{ScopedTrace, TRACE_NAME2, TRACE_NAME};
 
 pub struct Session<'r, 'l, R> {
     pub(crate) runtime: &'l VMRuntime,
@@ -30,6 +31,7 @@ impl<'r, 'l, R: RemoteCache> Session<'r, 'l, R> {
         cost_strategy: &mut CostStrategy,
         log_context: &impl LogContext,
     ) -> VMResult<()> {
+        TRACE_NAME2!("session.execute_function, function_name:{:?}", function_name);
         self.runtime.execute_function(
             module,
             function_name,
@@ -50,6 +52,7 @@ impl<'r, 'l, R: RemoteCache> Session<'r, 'l, R> {
         cost_strategy: &mut CostStrategy,
         log_context: &impl LogContext,
     ) -> VMResult<()> {
+        TRACE_NAME!("session.execute_script");
         self.runtime.execute_script(
             script,
             ty_args,
@@ -68,6 +71,7 @@ impl<'r, 'l, R: RemoteCache> Session<'r, 'l, R> {
         cost_strategy: &mut CostStrategy,
         log_context: &impl LogContext,
     ) -> VMResult<()> {
+        TRACE_NAME2!("session.publish_module,sender:{},module:{:?}", sender, &module);
         self.runtime.publish_module(
             module,
             sender,
@@ -82,6 +86,7 @@ impl<'r, 'l, R: RemoteCache> Session<'r, 'l, R> {
     }
 
     pub fn finish(self) -> VMResult<TransactionEffects> {
+        TRACE_NAME!("sessioin.finish");
         self.data_cache
             .into_effects()
             .map_err(|e| e.finish(Location::Undefined))

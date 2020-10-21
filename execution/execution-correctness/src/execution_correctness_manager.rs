@@ -92,6 +92,7 @@ impl ExecutionCorrectnessManager {
         execution_prikey: Option<Ed25519PrivateKey>,
         timeout: u64,
     ) -> Self {
+        tracing::info!("execution.new_local.addr:{}", storage_address);
         let block_executor = Box::new(Executor::<LibraVM>::new(
             StorageClient::new(&storage_address, timeout).into(),
         ));
@@ -130,6 +131,7 @@ impl ExecutionCorrectnessManager {
         execution_prikey: Option<Ed25519PrivateKey>,
         network_timeout: u64,
     ) -> Self {
+        tracing::info!("execution.new_thread.addr:{}", storage_address);
         let thread = ThreadService::new(storage_address, execution_prikey, network_timeout);
         Self {
             internal_execution_correctness: ExecutionCorrectnessWrapper::Thread(thread),
