@@ -21,7 +21,7 @@ use warp::{
     reject::{self, Reject},
     Filter,
 };
-use tracing::{span, debug_span};
+use tracing::{debug_span};
 use tracing_attributes::instrument;
 use tracing_atrace::InstrumentExt;
 

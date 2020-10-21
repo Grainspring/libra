@@ -37,7 +37,7 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{DbReader, Order};
-use tracing::{span, debug_span};
+use tracing::{debug_span};
 use tracing_attributes::instrument;
 use tracing_atrace::InstrumentExt;
 

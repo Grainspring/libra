@@ -122,7 +122,7 @@ impl LibraNode {
             }
             Ok(maybeval) => {
                 if maybeval.is_none() {
-                    println!("Node: {} did not report {}", self.node_id, metric_name);
+                //    println!("Node: {} did not report {}", self.node_id, metric_name);
                 }
                 maybeval
             }
@@ -136,10 +136,11 @@ impl LibraNode {
         );
         if let Some(num_connected_peers) = self.get_metric(&connected_peers) {
             if num_connected_peers < expected_peers {
-                println!(
+            /*    println!(
                     "Node '{}' Expected peers: {}, found peers: {}",
                     self.node_id, expected_peers, num_connected_peers
                 );
+            */
                 return false;
             } else {
                 return true;
@@ -149,13 +150,13 @@ impl LibraNode {
     }
 
     pub fn health_check(&mut self) -> HealthStatus {
-        println!("Health check on node '{}'", self.node_id);
+//        println!("Health check on node '{}'", self.node_id);
 
         // check if the process has terminated
         match self.node.try_wait() {
             // This would mean the child process has crashed
             Ok(Some(status)) => {
-                println!("Node '{}' crashed with: {}", self.node_id, status);
+                // println!("Node '{}' crashed with: {}", self.node_id, status);
                 return HealthStatus::Crashed(status);
             }
 
@@ -170,11 +171,11 @@ impl LibraNode {
 
         match self.debug_client.get_node_metrics() {
             Ok(_) => {
-                println!("Node '{}' is healthy", self.node_id);
+                // println!("Node '{}' is healthy", self.node_id);
                 HealthStatus::Healthy
             }
             Err(e) => {
-                println!("Error querying metrics for node '{}'", self.node_id);
+                // println!("Error querying metrics for node '{}'", self.node_id);
                 HealthStatus::RpcFailure(e)
             }
         }
@@ -355,7 +356,7 @@ impl LibraSwarm {
         let num_attempts = 60;
 
         for i in 0..num_attempts {
-            println!("Wait for connectivity attempt: {}", i);
+            // println!("Wait for connectivity attempt: {}", i);
 
             if self
                 .nodes
@@ -376,7 +377,7 @@ impl LibraSwarm {
         let num_attempts = 1200;
         let mut done = vec![false; self.nodes.len()];
         for i in 0..num_attempts {
-            println!("Wait for startup attempt: {} of {}", i, num_attempts);
+            // println!("Wait for startup attempt: {} of {}", i, num_attempts);
             for (node, done) in self.nodes.values_mut().zip(done.iter_mut()) {
                 if *done {
                     continue;

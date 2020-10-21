@@ -34,9 +34,7 @@ use std::{
 };
 use tokio::runtime::Handle;
 use vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
-use tracing::{span, debug_span};
 use tracing_attributes::instrument;
-use tracing_atrace::InstrumentExt;
 
 // ============================== //
 //  broadcast_coordinator tasks  //

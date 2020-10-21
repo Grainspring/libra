@@ -7,6 +7,7 @@ use libra_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use libatrace::{ScopedTrace, TRACE_NAME2};
 use libra_state_view::{StateView, StateViewId};
 use libra_types::{
     access_path::AccessPath,
@@ -15,6 +16,7 @@ use libra_types::{
     proof::SparseMerkleProof,
     transaction::{Version, PRE_GENESIS_VERSION},
 };
+use libra_logger::prelude::*;
 use scratchpad::{AccountStatus, SparseMerkleTree};
 use std::{
     cell::RefCell,
@@ -141,6 +143,7 @@ impl<'a> StateView for VerifiedStateView<'a> {
     fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
         let address = access_path.address;
         let path = &access_path.path;
+        info!(address = address, path = path, "stateview.get.path value");
         match self.account_to_state_cache.borrow_mut().entry(address) {
             Entry::Occupied(occupied) => Ok(occupied.get().get(path).cloned()),
             Entry::Vacant(vacant) => {
@@ -151,6 +154,9 @@ impl<'a> StateView for VerifiedStateView<'a> {
                     // No matter it is in db or unknown, we have to query from db since even the
                     // former case, we don't have the blob data but only its hash.
                     AccountStatus::ExistsInDB | AccountStatus::Unknown => {
+                        TRACE_NAME2!("stateview.get.get_account_state_with_proof_by_version \
+                            and verify,addr:{:?},path:{:?}", address, path);
+                        info!("get_account_state_with_proof_by_version and verify");
                         let (blob, proof) = match self.latest_persistent_version {
                             Some(version) => self
                                 .reader

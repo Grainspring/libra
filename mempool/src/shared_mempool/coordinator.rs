@@ -34,8 +34,7 @@ use std::{
 };
 use tokio::{runtime::Handle, time::interval};
 use vm_validator::vm_validator::TransactionValidation;
-use tracing::{span, debug_span};
-use tracing_attributes::instrument;
+use tracing::{debug_span};
 use tracing_atrace::InstrumentExt;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.

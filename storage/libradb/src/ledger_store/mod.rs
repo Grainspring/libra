@@ -21,6 +21,7 @@ use libra_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
 };
+use libra_logger::prelude::*;
 use libra_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -202,13 +203,15 @@ impl LedgerStore {
                 Some(self.get_tree_state(latest_version + 1, latest_txn_info)?),
             )
         };
-
-        Ok(Some(StartupInfo::new(
+        let startup_info = StartupInfo::new(
             latest_ledger_info,
             latest_epoch_state_if_not_in_li,
             commited_tree_state,
             synced_tree_state,
-        )))
+        );
+        tracing::info!("get_starup_info:{}", serde_json::to_string(&startup_info).unwrap());
+        info!(startup_info = startup_info, "get_startup_info");
+        Ok(Some(startup_info))
     }
 
     /// Get transaction info given `version`

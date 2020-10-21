@@ -40,7 +40,6 @@ use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
 use termion::color::*;
-use tracing::{span, debug_span};
 use tracing_attributes::instrument;
 
 #[derive(Serialize, Clone)]

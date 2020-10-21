@@ -42,9 +42,7 @@ use libra_types::{
 use network::protocols::network::Event;
 use safety_rules::SafetyRulesManager;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
-use tracing::{span, debug_span};
 use tracing_attributes::instrument;
-use tracing_atrace::InstrumentExt;
 
 /// RecoveryManager is used to process events in order to sync up with peer if we can't recover from local consensusdb
 /// RoundManager is used for normal event handling.
